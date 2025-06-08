@@ -55,7 +55,8 @@ export default {
                 humidity: '--'
             },
             relayStatus: [false, false, false, false], // 4路继电器状态
-            timer: null
+            timer: null,
+            onlineDevices: [] // 添加在线设备列表
         }
     },
     onLoad() {
@@ -72,9 +73,31 @@ export default {
             // 切换设备后重新获取状态
             this.getDeviceStatus()
         },
+        async getOnlineDevices() {
+            try {
+                const res = await uni.request({
+                    url: 'http://118.190.202.38:3000/api/online-dtus',
+                    method: 'GET'
+                })
+                
+                if(res.data.success) {
+                    this.onlineDevices = res.data.devices.map(device => device.dtuNo)
+                    // 更新当前设备的在线状态
+                    const currentDeviceId = this.deviceList[this.selectedIndex].id
+                    this.deviceStatus.isOnline = this.onlineDevices.includes(currentDeviceId)
+                }
+            } catch(e) {
+                console.error('获取在线设备失败:', e)
+            }
+        },
         startPolling() {
-            // 每5秒轮询一次设备状态
+            // 立即执行一次
+            this.getOnlineDevices()
+            this.getDeviceStatus()
+            
+            // 每5秒轮询一次
             this.timer = setInterval(() => {
+                this.getOnlineDevices()
                 this.getDeviceStatus()
             }, 5000)
         },
@@ -88,12 +111,22 @@ export default {
             try {
                 const deviceId = this.deviceList[this.selectedIndex].id
                 const res = await uni.request({
-                    url: 'http://118.190.202.38:3000/api/dtu-status',
-                    data: { deviceId }
+                    url: `http://118.190.202.38:3000/api/dtu-status/${deviceId}`,
+                    method: 'GET'
                 })
                 
                 if(res.data.code === 0) {
-                    this.deviceStatus = res.data.data
+                    // 更新设备数据，但保持在线状态
+                    const isOnline = this.onlineDevices.includes(deviceId)
+                    this.deviceStatus = {
+                        ...res.data.data,
+                        isOnline
+                    }
+                } else {
+                    uni.showToast({
+                        title: res.data.message || '获取设备状态失败',
+                        icon: 'none'
+                    })
                 }
             } catch(e) {
                 uni.showToast({
@@ -103,15 +136,27 @@ export default {
             }
         },
         async toggleRelay(index, status) {
+            const deviceId = this.deviceList[this.selectedIndex].id
+            
+            // 判断设备是否在线
+            if (!this.onlineDevices.includes(deviceId)) {
+                uni.showToast({
+                    title: '设备离线，无法控制',
+                    icon: 'none'
+                })
+                return
+            }
+
             try {
-                const deviceId = this.deviceList[this.selectedIndex].id
                 const res = await uni.request({
                     url: 'http://118.190.202.38:3000/api/control/relay',
                     method: 'POST',
                     data: {
-                        deviceId,
-                        relayIndex: index,
-                        status
+                        dtuNo: deviceId,
+                        command: status ? 'ON' : 'OFF'
+                    },
+                    header: {
+                        'content-type': 'application/json'
                     }
                 })
                 
@@ -120,6 +165,11 @@ export default {
                     uni.showToast({
                         title: '操作成功',
                         icon: 'success'
+                    })
+                } else {
+                    uni.showToast({
+                        title: res.data.message || '控制失败',
+                        icon: 'none'
                     })
                 }
             } catch(e) {

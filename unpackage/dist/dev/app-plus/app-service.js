@@ -31,6 +31,13 @@ if (uni.restoreGlobal) {
 }
 (function(vue) {
   "use strict";
+  function formatAppLog(type, filename, ...args) {
+    if (uni.__log__) {
+      uni.__log__(type, filename, ...args);
+    } else {
+      console[type].apply(console, [...args, filename]);
+    }
+  }
   const _export_sfc = (sfc, props) => {
     const target = sfc.__vccOpts || sfc;
     for (const [key, val] of props) {
@@ -54,7 +61,9 @@ if (uni.restoreGlobal) {
         },
         relayStatus: [false, false, false, false],
         // 4路继电器状态
-        timer: null
+        timer: null,
+        onlineDevices: []
+        // 添加在线设备列表
       };
     },
     onLoad() {
@@ -68,8 +77,26 @@ if (uni.restoreGlobal) {
         this.selectedIndex = e.detail.value;
         this.getDeviceStatus();
       },
+      async getOnlineDevices() {
+        try {
+          const res = await uni.request({
+            url: "http://118.190.202.38:3000/api/online-dtus",
+            method: "GET"
+          });
+          if (res.data.success) {
+            this.onlineDevices = res.data.devices.map((device) => device.dtuNo);
+            const currentDeviceId = this.deviceList[this.selectedIndex].id;
+            this.deviceStatus.isOnline = this.onlineDevices.includes(currentDeviceId);
+          }
+        } catch (e) {
+          formatAppLog("error", "at pages/index/index.vue:90", "获取在线设备失败:", e);
+        }
+      },
       startPolling() {
+        this.getOnlineDevices();
+        this.getDeviceStatus();
         this.timer = setInterval(() => {
+          this.getOnlineDevices();
           this.getDeviceStatus();
         }, 5e3);
       },
@@ -83,11 +110,20 @@ if (uni.restoreGlobal) {
         try {
           const deviceId = this.deviceList[this.selectedIndex].id;
           const res = await uni.request({
-            url: "http://118.190.202.38:3000/api/dtu-status",
-            data: { deviceId }
+            url: `http://118.190.202.38:3000/api/dtu-status/${deviceId}`,
+            method: "GET"
           });
           if (res.data.code === 0) {
-            this.deviceStatus = res.data.data;
+            const isOnline = this.onlineDevices.includes(deviceId);
+            this.deviceStatus = {
+              ...res.data.data,
+              isOnline
+            };
+          } else {
+            uni.showToast({
+              title: res.data.message || "获取设备状态失败",
+              icon: "none"
+            });
           }
         } catch (e) {
           uni.showToast({
@@ -97,15 +133,24 @@ if (uni.restoreGlobal) {
         }
       },
       async toggleRelay(index, status) {
+        const deviceId = this.deviceList[this.selectedIndex].id;
+        if (!this.onlineDevices.includes(deviceId)) {
+          uni.showToast({
+            title: "设备离线，无法控制",
+            icon: "none"
+          });
+          return;
+        }
         try {
-          const deviceId = this.deviceList[this.selectedIndex].id;
           const res = await uni.request({
             url: "http://118.190.202.38:3000/api/control/relay",
             method: "POST",
             data: {
-              deviceId,
-              relayIndex: index,
-              status
+              dtuNo: deviceId,
+              command: status ? "ON" : "OFF"
+            },
+            header: {
+              "content-type": "application/json"
             }
           });
           if (res.data.code === 0) {
@@ -113,6 +158,11 @@ if (uni.restoreGlobal) {
             uni.showToast({
               title: "操作成功",
               icon: "success"
+            });
+          } else {
+            uni.showToast({
+              title: res.data.message || "控制失败",
+              icon: "none"
             });
           }
         } catch (e) {
@@ -211,13 +261,6 @@ if (uni.restoreGlobal) {
   }
   const PagesIndexIndex = /* @__PURE__ */ _export_sfc(_sfc_main$1, [["render", _sfc_render], ["__file", "G:/桌面/app6/pages/index/index.vue"]]);
   __definePage("pages/index/index", PagesIndexIndex);
-  function formatAppLog(type, filename, ...args) {
-    if (uni.__log__) {
-      uni.__log__(type, filename, ...args);
-    } else {
-      console[type].apply(console, [...args, filename]);
-    }
-  }
   const _sfc_main = {
     onLaunch: function() {
       formatAppLog("log", "at App.vue:4", "App Launch");
