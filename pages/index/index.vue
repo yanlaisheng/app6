@@ -44,8 +44,9 @@ export default {
     data() {
         return {
             deviceList: [
-                { id: 'DTU001', name: 'DTU设备1' },
-                { id: 'DTU002', name: 'DTU设备2' }
+                { id: '13912345678', name: 'DTU设备1' },
+                { id: '13012345001', name: 'DTU设备2' },
+				{ id: '13912345679', name: 'DTU设备3' }
             ],
             selectedIndex: 0,
             deviceStatus: {
