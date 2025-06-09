@@ -49,21 +49,29 @@ if (uni.restoreGlobal) {
     data() {
       return {
         deviceList: [
-          { id: "13912345678", name: "DTU设备1" },
+          { id: "13012345005", name: "DTU设备1" },
           { id: "13012345001", name: "DTU设备2" },
-          { id: "13912345679", name: "DTU设备3" }
+          { id: "13912345678", name: "DTU设备3" },
+          { id: "13912345679", name: "DTU设备4" }
         ],
         selectedIndex: 0,
         deviceStatus: {
           isOnline: false,
-          temperature: "--",
-          humidity: "--"
+          dtuNo: "",
+          deviceName: "",
+          rcvTime: "",
+          voltageAB: "",
+          voltageBC: "",
+          voltageCA: "",
+          currentA: "",
+          currentB: "",
+          currentC: "",
+          energy: "",
+          pressure: "",
+          relayStatus: ""
         },
-        relayStatus: [false, false, false, false],
-        // 4路继电器状态
         timer: null,
         onlineDevices: []
-        // 添加在线设备列表
       };
     },
     onLoad() {
@@ -77,28 +85,11 @@ if (uni.restoreGlobal) {
         this.selectedIndex = e.detail.value;
         this.getDeviceStatus();
       },
-      async getOnlineDevices() {
-        try {
-          const res = await uni.request({
-            url: "http://118.190.202.38:3000/api/online-dtus",
-            method: "GET"
-          });
-          if (res.data.success) {
-            this.onlineDevices = res.data.devices.map((device) => device.dtuNo);
-            const currentDeviceId = this.deviceList[this.selectedIndex].id;
-            this.deviceStatus.isOnline = this.onlineDevices.includes(currentDeviceId);
-          }
-        } catch (e) {
-          formatAppLog("error", "at pages/index/index.vue:90", "获取在线设备失败:", e);
-        }
-      },
       startPolling() {
-        this.getOnlineDevices();
         this.getDeviceStatus();
         this.timer = setInterval(() => {
-          this.getOnlineDevices();
           this.getDeviceStatus();
-        }, 5e3);
+        }, 1e3);
       },
       stopPolling() {
         if (this.timer) {
@@ -109,32 +100,54 @@ if (uni.restoreGlobal) {
       async getDeviceStatus() {
         try {
           const deviceId = this.deviceList[this.selectedIndex].id;
-          const res = await uni.request({
-            url: `http://118.190.202.38:3000/api/dtu-status/${deviceId}`,
+          const onlineRes = await uni.request({
+            url: "http://118.190.202.38:3000/api/online-dtus",
             method: "GET"
           });
-          if (res.data.code === 0) {
-            const isOnline = this.onlineDevices.includes(deviceId);
-            this.deviceStatus = {
-              ...res.data.data,
-              isOnline
-            };
-          } else {
-            uni.showToast({
-              title: res.data.message || "获取设备状态失败",
-              icon: "none"
-            });
+          if (onlineRes.data.success) {
+            const onlineDevices = onlineRes.data.devices.map((device) => device.dtuNo);
+            const isOnline = onlineDevices.includes(deviceId);
+            this.deviceStatus.isOnline = isOnline;
+            if (isOnline) {
+              const statusRes = await uni.request({
+                url: `http://118.190.202.38:3000/api/dtu-status/${deviceId}`,
+                method: "GET"
+              });
+              if (statusRes.data.success) {
+                this.deviceStatus = {
+                  ...statusRes.data.data,
+                  isOnline
+                };
+              }
+            } else {
+              this.deviceStatus = {
+                isOnline: false,
+                dtuNo: deviceId,
+                deviceName: this.deviceList[this.selectedIndex].name,
+                rcvTime: "",
+                voltageAB: "",
+                voltageBC: "",
+                voltageCA: "",
+                currentA: "",
+                currentB: "",
+                currentC: "",
+                energy: "",
+                pressure: "",
+                relayStatus: ""
+              };
+            }
           }
         } catch (e) {
+          formatAppLog("error", "at pages/index/index.vue:178", "获取设备状态失败:", e);
           uni.showToast({
             title: "获取设备状态失败",
             icon: "none"
           });
         }
       },
-      async toggleRelay(index, status) {
+      async toggleRelay(status) {
         const deviceId = this.deviceList[this.selectedIndex].id;
-        if (!this.onlineDevices.includes(deviceId)) {
+        if (!this.deviceStatus.isOnline) {
           uni.showToast({
             title: "设备离线，无法控制",
             icon: "none"
@@ -142,6 +155,7 @@ if (uni.restoreGlobal) {
           return;
         }
         try {
+          this.stopPolling();
           const res = await uni.request({
             url: "http://118.190.202.38:3000/api/control/relay",
             method: "POST",
@@ -154,18 +168,23 @@ if (uni.restoreGlobal) {
             }
           });
           if (res.data.code === 0) {
-            this.relayStatus[index] = status;
+            this.deviceStatus.relayStatus = status ? "闭合" : "断开";
             uni.showToast({
               title: "操作成功",
               icon: "success"
             });
+            setTimeout(() => {
+              this.startPolling();
+            }, 1e3);
           } else {
+            this.startPolling();
             uni.showToast({
               title: res.data.message || "控制失败",
               icon: "none"
             });
           }
         } catch (e) {
+          this.startPolling();
           uni.showToast({
             title: "控制失败",
             icon: "none"
@@ -208,21 +227,91 @@ if (uni.restoreGlobal) {
           )
         ]),
         vue.createElementVNode("view", { class: "status-item" }, [
-          vue.createElementVNode("text", null, "电压:"),
+          vue.createElementVNode("text", null, "更新时间:"),
           vue.createElementVNode(
             "text",
             null,
-            vue.toDisplayString($data.deviceStatus.temperature) + "V",
+            vue.toDisplayString($data.deviceStatus.rcvTime || "--"),
             1
             /* TEXT */
           )
         ]),
         vue.createElementVNode("view", { class: "status-item" }, [
-          vue.createElementVNode("text", null, "电流:"),
+          vue.createElementVNode("text", null, "AB线电压:"),
           vue.createElementVNode(
             "text",
             null,
-            vue.toDisplayString($data.deviceStatus.humidity) + "A",
+            vue.toDisplayString($data.deviceStatus.voltageAB || "--") + " V",
+            1
+            /* TEXT */
+          )
+        ]),
+        vue.createElementVNode("view", { class: "status-item" }, [
+          vue.createElementVNode("text", null, "BC线电压:"),
+          vue.createElementVNode(
+            "text",
+            null,
+            vue.toDisplayString($data.deviceStatus.voltageBC || "--") + " V",
+            1
+            /* TEXT */
+          )
+        ]),
+        vue.createElementVNode("view", { class: "status-item" }, [
+          vue.createElementVNode("text", null, "CA线电压:"),
+          vue.createElementVNode(
+            "text",
+            null,
+            vue.toDisplayString($data.deviceStatus.voltageCA || "--") + " V",
+            1
+            /* TEXT */
+          )
+        ]),
+        vue.createElementVNode("view", { class: "status-item" }, [
+          vue.createElementVNode("text", null, "A相电流:"),
+          vue.createElementVNode(
+            "text",
+            null,
+            vue.toDisplayString($data.deviceStatus.currentA || "--") + " A",
+            1
+            /* TEXT */
+          )
+        ]),
+        vue.createElementVNode("view", { class: "status-item" }, [
+          vue.createElementVNode("text", null, "B相电流:"),
+          vue.createElementVNode(
+            "text",
+            null,
+            vue.toDisplayString($data.deviceStatus.currentB || "--") + " A",
+            1
+            /* TEXT */
+          )
+        ]),
+        vue.createElementVNode("view", { class: "status-item" }, [
+          vue.createElementVNode("text", null, "C相电流:"),
+          vue.createElementVNode(
+            "text",
+            null,
+            vue.toDisplayString($data.deviceStatus.currentC || "--") + " A",
+            1
+            /* TEXT */
+          )
+        ]),
+        vue.createElementVNode("view", { class: "status-item" }, [
+          vue.createElementVNode("text", null, "用电量:"),
+          vue.createElementVNode(
+            "text",
+            null,
+            vue.toDisplayString($data.deviceStatus.energy || "--") + " kWh",
+            1
+            /* TEXT */
+          )
+        ]),
+        vue.createElementVNode("view", { class: "status-item" }, [
+          vue.createElementVNode("text", null, "压力:"),
+          vue.createElementVNode(
+            "text",
+            null,
+            vue.toDisplayString($data.deviceStatus.pressure || "--") + " MPa",
             1
             /* TEXT */
           )
@@ -230,31 +319,18 @@ if (uni.restoreGlobal) {
       ]),
       vue.createCommentVNode(" 继电器控制区 "),
       vue.createElementVNode("view", { class: "control-panel" }, [
-        vue.createElementVNode("view", { class: "relay-list" }, [
-          (vue.openBlock(true), vue.createElementBlock(
-            vue.Fragment,
+        vue.createElementVNode("view", { class: "relay-item" }, [
+          vue.createElementVNode(
+            "text",
             null,
-            vue.renderList($data.relayStatus, (relay, index) => {
-              return vue.openBlock(), vue.createElementBlock("view", {
-                key: index,
-                class: "relay-item"
-              }, [
-                vue.createElementVNode(
-                  "text",
-                  null,
-                  "继电器" + vue.toDisplayString(index + 1),
-                  1
-                  /* TEXT */
-                ),
-                vue.createElementVNode("switch", {
-                  checked: relay,
-                  onChange: (e) => $options.toggleRelay(index, e.detail.value)
-                }, null, 40, ["checked", "onChange"])
-              ]);
-            }),
-            128
-            /* KEYED_FRAGMENT */
-          ))
+            "继电器状态: " + vue.toDisplayString($data.deviceStatus.relayStatus || "--"),
+            1
+            /* TEXT */
+          ),
+          vue.createElementVNode("switch", {
+            checked: $data.deviceStatus.relayStatus === "闭合",
+            onChange: _cache[1] || (_cache[1] = (e) => $options.toggleRelay(e.detail.value))
+          }, null, 40, ["checked"])
         ])
       ])
     ]);
