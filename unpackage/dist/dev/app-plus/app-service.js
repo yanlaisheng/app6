@@ -49,12 +49,8 @@ if (uni.restoreGlobal) {
   const _sfc_main$1 = {
     data() {
       return {
-        deviceList: [
-          { id: "13012345005", name: "DTU设备1", isOnline: false },
-          { id: "13012345001", name: "DTU设备2", isOnline: false },
-          { id: "13912345678", name: "DTU设备3", isOnline: false },
-          { id: "13912345679", name: "DTU设备4", isOnline: false }
-        ],
+        deviceList: [],
+        // 改为空数组，等待API获取数据
         selectedIndex: 0,
         deviceStatus: {
           isOnline: false,
@@ -77,7 +73,11 @@ if (uni.restoreGlobal) {
       };
     },
     onLoad() {
-      this.startPolling();
+      this.fetchDeviceList().then(() => {
+        if (this.deviceList.length > 0) {
+          this.startPolling();
+        }
+      });
     },
     onUnload() {
       this.stopPolling();
@@ -96,21 +96,35 @@ if (uni.restoreGlobal) {
       }
     },
     methods: {
-      async updateDevicesOnlineStatus() {
+      // 添加获取设备列表的方法
+      async fetchDeviceList() {
         try {
-          const onlineRes = await uni.request({
-            url: `${BASE_URL}/online-dtus`,
+          const res = await uni.request({
+            url: `${BASE_URL}/devices`,
             method: "GET"
           });
-          if (onlineRes.data.success) {
-            const onlineDevices = onlineRes.data.devices.map((device) => device.dtuNo);
-            this.deviceList = this.deviceList.map((device) => ({
-              ...device,
-              isOnline: onlineDevices.includes(device.id)
+          if (res.data.success) {
+            this.deviceList = res.data.devices.map((device) => ({
+              id: device.DtuNo,
+              // 使用 DtuNo 字段
+              name: device.DeviceName,
+              // 使用 DeviceName 字段
+              isOnline: false
+              // 初始化为离线状态
             }));
+            await this.updateDevicesOnlineStatus();
+          } else {
+            uni.showToast({
+              title: "获取设备列表失败",
+              icon: "none"
+            });
           }
         } catch (e) {
-          formatAppLog("error", "at pages/index/index.vue:187", "获取在线设备失败:", e);
+          formatAppLog("error", "at pages/index/index.vue:198", "获取设备列表失败:", e);
+          uni.showToast({
+            title: "获取设备列表失败",
+            icon: "none"
+          });
         }
       },
       // 修改设备选择方法
@@ -119,6 +133,8 @@ if (uni.restoreGlobal) {
         await this.getDeviceStatus();
       },
       startPolling() {
+        if (this.deviceList.length === 0)
+          return;
         this.updateDevicesOnlineStatus();
         this.getDeviceStatus();
         this.timer = setInterval(() => {
@@ -173,7 +189,7 @@ if (uni.restoreGlobal) {
             }
           }
         } catch (e) {
-          formatAppLog("error", "at pages/index/index.vue:263", "获取设备状态失败:", e);
+          formatAppLog("error", "at pages/index/index.vue:280", "获取设备状态失败:", e);
           uni.showToast({
             title: "获取设备状态失败",
             icon: "none"
@@ -237,6 +253,26 @@ if (uni.restoreGlobal) {
         this.selectedIndex = index;
         this.hidePicker();
         await this.getDeviceStatus();
+      },
+      // 修改在线状态更新方法
+      async updateDevicesOnlineStatus() {
+        if (this.deviceList.length === 0)
+          return;
+        try {
+          const onlineRes = await uni.request({
+            url: `${BASE_URL}/online-dtus`,
+            method: "GET"
+          });
+          if (onlineRes.data.success) {
+            const onlineDevices = onlineRes.data.devices.map((device) => device.dtuNo);
+            this.deviceList = this.deviceList.map((device) => ({
+              ...device,
+              isOnline: onlineDevices.includes(device.id)
+            }));
+          }
+        } catch (e) {
+          formatAppLog("error", "at pages/index/index.vue:379", "获取在线设备失败:", e);
+        }
       }
     }
   };
@@ -336,6 +372,12 @@ if (uni.restoreGlobal) {
           ])
         ])) : vue.createCommentVNode("v-if", true),
         vue.createElementVNode("view", { class: "container" }, [
+          $data.deviceList.length === 0 ? (vue.openBlock(), vue.createElementBlock("view", {
+            key: 0,
+            class: "empty-list"
+          }, [
+            vue.createElementVNode("text", null, "暂无可用设备")
+          ])) : vue.createCommentVNode("v-if", true),
           vue.createCommentVNode(" 设备状态显示区 "),
           vue.createElementVNode("view", { class: "status-panel" }, [
             vue.createElementVNode("view", { class: "status-item status-connection" }, [

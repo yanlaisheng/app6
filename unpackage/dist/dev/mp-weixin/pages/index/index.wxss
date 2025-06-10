@@ -238,3 +238,9 @@ to {
         transform: translateY(0);
 }
 }
+.empty-list {
+    text-align: center;
+    padding: 40px 0;
+    color: #999;
+    font-size: 14px;
+}

@@ -1,4 +1,6 @@
 <template>
+
+
     <!-- 替换原有的picker部分 -->
     <view class="device-select">
         <view class="picker-button" @tap="showDeviceList">
@@ -41,6 +43,9 @@
     </view>
 
     <view class="container">
+        <view v-if="deviceList.length === 0" class="empty-list">
+            <text>暂无可用设备</text>
+        </view>
         
         <!-- 设备状态显示区 -->
         <view class="status-panel">
@@ -109,6 +114,12 @@
             </view>
         </view>
     </view>
+
+    <!-- 在container最后添加版权信息 -->
+    <view class="copyright">
+        <text>青岛三利智能动力有限公司</text>
+        <text>copyright 2025</text>
+    </view>
 </template>
 
 <script>
@@ -118,12 +129,7 @@ const BASE_URL = 'https://monitor.sanli.cn:3000/api'
 export default {
     data() {
         return {
-            deviceList: [
-                { id: '13012345005', name: 'DTU设备1', isOnline: false },
-                { id: '13012345001', name: 'DTU设备2', isOnline: false },
-                { id: '13912345678', name: 'DTU设备3', isOnline: false },
-                { id: '13912345679', name: 'DTU设备4', isOnline: false }
-            ],
+            deviceList: [], // 改为空数组，等待API获取数据
             selectedIndex: 0,
             deviceStatus: {
                 isOnline: false,
@@ -146,8 +152,12 @@ export default {
         }
     },
     onLoad() {
-        // 页面加载时开始轮询设备状态
-        this.startPolling()
+        // 先获取设备列表，然后开始轮询
+        this.fetchDeviceList().then(() => {
+            if(this.deviceList.length > 0) {
+                this.startPolling()
+            }
+        })
     },
     onUnload() {
         // 页面卸载时清除轮询
@@ -168,26 +178,39 @@ export default {
         }
     },
     methods: {
-        async updateDevicesOnlineStatus() {
+        // 添加获取设备列表的方法
+        async fetchDeviceList() {
             try {
-                const onlineRes = await uni.request({
-                    url: `${BASE_URL}/online-dtus`,
+                const res = await uni.request({
+                    url: `${BASE_URL}/devices`,
                     method: 'GET'
                 })
                 
-                if(onlineRes.data.success) {
-                    const onlineDevices = onlineRes.data.devices.map(device => device.dtuNo)
-                    // 更新所有设备的在线状态
-                    this.deviceList = this.deviceList.map(device => ({
-                        ...device,
-                        isOnline: onlineDevices.includes(device.id)
+                if(res.data.success) {
+                    // 根据API返回的JSON格式转换设备列表
+                    this.deviceList = res.data.devices.map(device => ({
+                        id: device.DtuNo,         // 使用 DtuNo 字段
+                        name: device.DeviceName,   // 使用 DeviceName 字段
+                        isOnline: false           // 初始化为离线状态
                     }))
+                    
+                    // 获取设备列表后立即更新在线状态
+                    await this.updateDevicesOnlineStatus()
+                } else {
+                    uni.showToast({
+                        title: '获取设备列表失败',
+                        icon: 'none'
+                    })
                 }
             } catch(e) {
-                console.error('获取在线设备失败:', e)
+                console.error('获取设备列表失败:', e)
+                uni.showToast({
+                    title: '获取设备列表失败',
+                    icon: 'none'
+                })
             }
         },
-        
+
         // 修改设备选择方法
         async onDeviceChange(e) {
             this.selectedIndex = e.detail.value
@@ -195,6 +218,8 @@ export default {
         },
 
         startPolling() {
+            if(this.deviceList.length === 0) return
+
             // 立即执行更新
             this.updateDevicesOnlineStatus()
             this.getDeviceStatus()
@@ -338,12 +363,57 @@ export default {
             this.selectedIndex = index
             this.hidePicker()
             await this.getDeviceStatus()
+        },
+
+        // 修改在线状态更新方法
+        async updateDevicesOnlineStatus() {
+            if(this.deviceList.length === 0) return
+
+            try {
+                const onlineRes = await uni.request({
+                    url: `${BASE_URL}/online-dtus`,
+                    method: 'GET'
+                })
+                
+                if(onlineRes.data.success) {
+                    const onlineDevices = onlineRes.data.devices.map(device => device.dtuNo)
+                    // 更新所有设备的在线状态
+                    this.deviceList = this.deviceList.map(device => ({
+                        ...device,
+                        isOnline: onlineDevices.includes(device.id)
+                    }))
+                }
+            } catch(e) {
+                console.error('获取在线设备失败:', e)
+            }
         }
     }
 }
 </script>
 
 <style>
+/* 添加标题栏样式 */
+.header {
+    display: flex;
+    align-items: center;
+    padding: 10px 15px;
+    background: #ffffff;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    margin-bottom: 15px;
+}
+
+.logo {
+    width: 32px;
+    height: 32px;
+    margin-right: 10px;
+}
+
+.title {
+    font-size: 16px;
+    font-weight: 500;
+    color: #333;
+}
+
 .container {
     padding: 20px;
 }
@@ -625,5 +695,23 @@ export default {
     to {
         transform: translateY(0);
     }
+}
+
+.empty-list {
+    text-align: center;
+    padding: 40px 0;
+    color: #999;
+    font-size: 14px;
+}
+
+.copyright {
+    margin-top: 30px;
+    padding: 20px 0;
+    text-align: center;
+    font-size: 12px;
+    color: #999;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
 }
 </style>

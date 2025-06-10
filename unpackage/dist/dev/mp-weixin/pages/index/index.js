@@ -4,12 +4,8 @@ const BASE_URL = "https://monitor.sanli.cn:3000/api";
 const _sfc_main = {
   data() {
     return {
-      deviceList: [
-        { id: "13012345005", name: "DTU设备1", isOnline: false },
-        { id: "13012345001", name: "DTU设备2", isOnline: false },
-        { id: "13912345678", name: "DTU设备3", isOnline: false },
-        { id: "13912345679", name: "DTU设备4", isOnline: false }
-      ],
+      deviceList: [],
+      // 改为空数组，等待API获取数据
       selectedIndex: 0,
       deviceStatus: {
         isOnline: false,
@@ -32,7 +28,11 @@ const _sfc_main = {
     };
   },
   onLoad() {
-    this.startPolling();
+    this.fetchDeviceList().then(() => {
+      if (this.deviceList.length > 0) {
+        this.startPolling();
+      }
+    });
   },
   onUnload() {
     this.stopPolling();
@@ -51,21 +51,35 @@ const _sfc_main = {
     }
   },
   methods: {
-    async updateDevicesOnlineStatus() {
+    // 添加获取设备列表的方法
+    async fetchDeviceList() {
       try {
-        const onlineRes = await common_vendor.index.request({
-          url: `${BASE_URL}/online-dtus`,
+        const res = await common_vendor.index.request({
+          url: `${BASE_URL}/devices`,
           method: "GET"
         });
-        if (onlineRes.data.success) {
-          const onlineDevices = onlineRes.data.devices.map((device) => device.dtuNo);
-          this.deviceList = this.deviceList.map((device) => ({
-            ...device,
-            isOnline: onlineDevices.includes(device.id)
+        if (res.data.success) {
+          this.deviceList = res.data.devices.map((device) => ({
+            id: device.DtuNo,
+            // 使用 DtuNo 字段
+            name: device.DeviceName,
+            // 使用 DeviceName 字段
+            isOnline: false
+            // 初始化为离线状态
           }));
+          await this.updateDevicesOnlineStatus();
+        } else {
+          common_vendor.index.showToast({
+            title: "获取设备列表失败",
+            icon: "none"
+          });
         }
       } catch (e) {
-        common_vendor.index.__f__("error", "at pages/index/index.vue:187", "获取在线设备失败:", e);
+        common_vendor.index.__f__("error", "at pages/index/index.vue:198", "获取设备列表失败:", e);
+        common_vendor.index.showToast({
+          title: "获取设备列表失败",
+          icon: "none"
+        });
       }
     },
     // 修改设备选择方法
@@ -74,6 +88,8 @@ const _sfc_main = {
       await this.getDeviceStatus();
     },
     startPolling() {
+      if (this.deviceList.length === 0)
+        return;
       this.updateDevicesOnlineStatus();
       this.getDeviceStatus();
       this.timer = setInterval(() => {
@@ -128,7 +144,7 @@ const _sfc_main = {
           }
         }
       } catch (e) {
-        common_vendor.index.__f__("error", "at pages/index/index.vue:263", "获取设备状态失败:", e);
+        common_vendor.index.__f__("error", "at pages/index/index.vue:280", "获取设备状态失败:", e);
         common_vendor.index.showToast({
           title: "获取设备状态失败",
           icon: "none"
@@ -192,6 +208,26 @@ const _sfc_main = {
       this.selectedIndex = index;
       this.hidePicker();
       await this.getDeviceStatus();
+    },
+    // 修改在线状态更新方法
+    async updateDevicesOnlineStatus() {
+      if (this.deviceList.length === 0)
+        return;
+      try {
+        const onlineRes = await common_vendor.index.request({
+          url: `${BASE_URL}/online-dtus`,
+          method: "GET"
+        });
+        if (onlineRes.data.success) {
+          const onlineDevices = onlineRes.data.devices.map((device) => device.dtuNo);
+          this.deviceList = this.deviceList.map((device) => ({
+            ...device,
+            isOnline: onlineDevices.includes(device.id)
+          }));
+        }
+      } catch (e) {
+        common_vendor.index.__f__("error", "at pages/index/index.vue:379", "获取在线设备失败:", e);
+      }
     }
   }
 };
@@ -218,23 +254,25 @@ function _sfc_render(_ctx, _cache, $props, $setup, $data, $options) {
     }),
     i: common_vendor.o((...args) => $options.hidePicker && $options.hidePicker(...args))
   } : {}, {
-    j: common_vendor.t($data.deviceStatus.isOnline ? "在线" : "离线"),
-    k: $data.deviceStatus.isOnline ? 1 : "",
-    l: !$data.deviceStatus.isOnline ? 1 : "",
-    m: common_vendor.t($options.formattedTime),
-    n: common_vendor.t($data.deviceStatus.voltageAB || "--"),
-    o: common_vendor.t($data.deviceStatus.voltageBC || "--"),
-    p: common_vendor.t($data.deviceStatus.voltageCA || "--"),
-    q: common_vendor.t($data.deviceStatus.currentA || "--"),
-    r: common_vendor.t($data.deviceStatus.currentB || "--"),
-    s: common_vendor.t($data.deviceStatus.currentC || "--"),
-    t: common_vendor.t($data.deviceStatus.energy || "--"),
-    v: common_vendor.t($data.deviceStatus.pressure || "--"),
-    w: common_vendor.t($data.deviceStatus.relayStatus || "--"),
-    x: common_vendor.n($data.deviceStatus.relayStatus === "闭合" ? "relay-on" : "relay-off"),
-    y: $data.deviceStatus.relayStatus === "闭合",
-    z: common_vendor.o((e) => $options.toggleRelay(e.detail.value)),
-    A: !$data.deviceStatus.isOnline
+    j: $data.deviceList.length === 0
+  }, $data.deviceList.length === 0 ? {} : {}, {
+    k: common_vendor.t($data.deviceStatus.isOnline ? "在线" : "离线"),
+    l: $data.deviceStatus.isOnline ? 1 : "",
+    m: !$data.deviceStatus.isOnline ? 1 : "",
+    n: common_vendor.t($options.formattedTime),
+    o: common_vendor.t($data.deviceStatus.voltageAB || "--"),
+    p: common_vendor.t($data.deviceStatus.voltageBC || "--"),
+    q: common_vendor.t($data.deviceStatus.voltageCA || "--"),
+    r: common_vendor.t($data.deviceStatus.currentA || "--"),
+    s: common_vendor.t($data.deviceStatus.currentB || "--"),
+    t: common_vendor.t($data.deviceStatus.currentC || "--"),
+    v: common_vendor.t($data.deviceStatus.energy || "--"),
+    w: common_vendor.t($data.deviceStatus.pressure || "--"),
+    x: common_vendor.t($data.deviceStatus.relayStatus || "--"),
+    y: common_vendor.n($data.deviceStatus.relayStatus === "闭合" ? "relay-on" : "relay-off"),
+    z: $data.deviceStatus.relayStatus === "闭合",
+    A: common_vendor.o((e) => $options.toggleRelay(e.detail.value)),
+    B: !$data.deviceStatus.isOnline
   });
 }
 const MiniProgramPage = /* @__PURE__ */ common_vendor._export_sfc(_sfc_main, [["render", _sfc_render]]);
