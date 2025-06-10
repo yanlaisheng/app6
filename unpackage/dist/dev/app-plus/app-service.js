@@ -71,7 +71,11 @@ if (uni.restoreGlobal) {
           relayStatus: ""
         },
         timer: null,
-        onlineDevices: []
+        onlineDevices: [],
+        isRelayLoading: false,
+        // 添加继电器状态加载标志
+        localRelayStatus: ""
+        // 添加本地继电器状态
       };
     },
     onLoad() {
@@ -79,6 +83,17 @@ if (uni.restoreGlobal) {
     },
     onUnload() {
       this.stopPolling();
+    },
+    watch: {
+      // 监听deviceStatus中的继电器状态变化
+      "deviceStatus.relayStatus": {
+        immediate: true,
+        handler(newVal) {
+          if (!this.isRelayLoading) {
+            this.localRelayStatus = newVal;
+          }
+        }
+      }
     },
     methods: {
       onDeviceChange(e) {
@@ -89,7 +104,7 @@ if (uni.restoreGlobal) {
         this.getDeviceStatus();
         this.timer = setInterval(() => {
           this.getDeviceStatus();
-        }, 1e3);
+        }, 2e3);
       },
       stopPolling() {
         if (this.timer) {
@@ -100,6 +115,9 @@ if (uni.restoreGlobal) {
       async getDeviceStatus() {
         try {
           const deviceId = this.deviceList[this.selectedIndex].id;
+          if (this.isRelayLoading) {
+            return;
+          }
           const onlineRes = await uni.request({
             url: "http://118.190.202.38:3000/api/online-dtus",
             method: "GET"
@@ -107,19 +125,18 @@ if (uni.restoreGlobal) {
           if (onlineRes.data.success) {
             const onlineDevices = onlineRes.data.devices.map((device) => device.dtuNo);
             const isOnline = onlineDevices.includes(deviceId);
-            this.deviceStatus.isOnline = isOnline;
             if (isOnline) {
               const statusRes = await uni.request({
                 url: `http://118.190.202.38:3000/api/dtu-status/${deviceId}`,
                 method: "GET"
               });
-              if (statusRes.data.success) {
+              if (statusRes.data.success && !this.isRelayLoading) {
                 this.deviceStatus = {
                   ...statusRes.data.data,
                   isOnline
                 };
               }
-            } else {
+            } else if (!this.isRelayLoading) {
               this.deviceStatus = {
                 isOnline: false,
                 dtuNo: deviceId,
@@ -138,14 +155,17 @@ if (uni.restoreGlobal) {
             }
           }
         } catch (e) {
-          formatAppLog("error", "at pages/index/index.vue:178", "获取设备状态失败:", e);
-          uni.showToast({
-            title: "获取设备状态失败",
-            icon: "none"
-          });
+          formatAppLog("error", "at pages/index/index.vue:202", "获取设备状态失败:", e);
+          if (!this.isRelayLoading) {
+            uni.showToast({
+              title: "获取设备状态失败",
+              icon: "none"
+            });
+          }
         }
       },
-      async toggleRelay(status) {
+      async toggleRelay(e) {
+        const status = e.detail.value;
         const deviceId = this.deviceList[this.selectedIndex].id;
         if (!this.deviceStatus.isOnline) {
           uni.showToast({
@@ -154,8 +174,11 @@ if (uni.restoreGlobal) {
           });
           return;
         }
+        this.isRelayLoading = true;
+        this.stopPolling();
+        const oldStatus = this.deviceStatus.relayStatus;
         try {
-          this.stopPolling();
+          this.deviceStatus.relayStatus = status ? "闭合" : "断开";
           const res = await uni.request({
             url: "http://118.190.202.38:3000/api/control/relay",
             method: "POST",
@@ -168,22 +191,36 @@ if (uni.restoreGlobal) {
             }
           });
           if (res.data.code === 0) {
-            this.deviceStatus.relayStatus = status ? "闭合" : "断开";
             uni.showToast({
               title: "操作成功",
               icon: "success"
             });
-            setTimeout(() => {
+            setTimeout(async () => {
+              const statusRes = await uni.request({
+                url: `http://118.190.202.38:3000/api/dtu-status/${deviceId}`,
+                method: "GET"
+              });
+              if (statusRes.data.success) {
+                this.deviceStatus = {
+                  ...statusRes.data.data,
+                  isOnline: true
+                };
+              }
+              this.isRelayLoading = false;
               this.startPolling();
             }, 1e3);
           } else {
+            this.deviceStatus.relayStatus = oldStatus;
+            this.isRelayLoading = false;
             this.startPolling();
             uni.showToast({
               title: res.data.message || "控制失败",
               icon: "none"
             });
           }
-        } catch (e) {
+        } catch (e2) {
+          this.deviceStatus.relayStatus = oldStatus;
+          this.isRelayLoading = false;
           this.startPolling();
           uni.showToast({
             title: "控制失败",
@@ -320,17 +357,25 @@ if (uni.restoreGlobal) {
       vue.createCommentVNode(" 继电器控制区 "),
       vue.createElementVNode("view", { class: "control-panel" }, [
         vue.createElementVNode("view", { class: "relay-item" }, [
-          vue.createElementVNode(
-            "text",
-            null,
-            "继电器状态: " + vue.toDisplayString($data.deviceStatus.relayStatus || "--"),
-            1
-            /* TEXT */
-          ),
+          vue.createElementVNode("view", { class: "relay-status" }, [
+            vue.createElementVNode("text", null, "继电器状态: "),
+            !$data.isRelayLoading ? (vue.openBlock(), vue.createElementBlock(
+              "text",
+              { key: 0 },
+              vue.toDisplayString($data.deviceStatus.relayStatus || "--"),
+              1
+              /* TEXT */
+            )) : (vue.openBlock(), vue.createElementBlock("view", {
+              key: 1,
+              class: "loading-icon"
+            }))
+          ]),
           vue.createElementVNode("switch", {
             checked: $data.deviceStatus.relayStatus === "闭合",
-            onChange: _cache[1] || (_cache[1] = (e) => $options.toggleRelay(e.detail.value))
-          }, null, 40, ["checked"])
+            onChange: _cache[1] || (_cache[1] = (...args) => $options.toggleRelay && $options.toggleRelay(...args)),
+            disabled: !$data.deviceStatus.isOnline || $data.isRelayLoading,
+            style: vue.normalizeStyle({ opacity: !$data.deviceStatus.isOnline || $data.isRelayLoading ? 0.5 : 1 })
+          }, null, 44, ["checked", "disabled"])
         ])
       ])
     ]);

@@ -58,9 +58,19 @@
         <!-- 继电器控制区 -->
         <view class="control-panel">
             <view class="relay-item">
-                <text>继电器状态: {{deviceStatus.relayStatus || '--'}}</text>
-                <switch :checked="deviceStatus.relayStatus === '闭合'" 
-                        @change="(e) => toggleRelay(e.detail.value)" />
+                <view class="relay-status">
+                    <text>继电器状态: </text>
+                    <text v-if="!isRelayLoading">
+                        {{deviceStatus.relayStatus || '--'}}
+                    </text>
+                    <view v-else class="loading-icon"></view>
+                </view>
+                <switch 
+                    :checked="deviceStatus.relayStatus === '闭合'"
+                    @change="toggleRelay"
+                    :disabled="!deviceStatus.isOnline || isRelayLoading"
+                    :style="{ opacity: (!deviceStatus.isOnline || isRelayLoading) ? 0.5 : 1 }"
+                />
             </view>
         </view>
     </view>
@@ -93,7 +103,9 @@ export default {
                 relayStatus: ''
             },
             timer: null,
-            onlineDevices: []
+            onlineDevices: [],
+            isRelayLoading: false, // 添加继电器状态加载标志
+            localRelayStatus: '' // 添加本地继电器状态
         }
     },
     onLoad() {
@@ -104,6 +116,17 @@ export default {
         // 页面卸载时清除轮询
         this.stopPolling()
     },
+    watch: {
+        // 监听deviceStatus中的继电器状态变化
+        'deviceStatus.relayStatus': {
+            immediate: true,
+            handler(newVal) {
+                if (!this.isRelayLoading) {
+                    this.localRelayStatus = newVal
+                }
+            }
+        }
+    },
     methods: {
         onDeviceChange(e) {
             this.selectedIndex = e.detail.value
@@ -112,13 +135,10 @@ export default {
         },
 
         startPolling() {
-            // 立即执行一次当前设备状态查询
             this.getDeviceStatus()
-            
-            // 将轮询间隔从5秒改为1秒
             this.timer = setInterval(() => {
                 this.getDeviceStatus()
-            }, 1000)  // 改为1000毫秒
+            }, 2000)  // 改为2000毫秒
         },
 
         stopPolling() {
@@ -131,6 +151,11 @@ export default {
             try {
                 const deviceId = this.deviceList[this.selectedIndex].id
                 
+                // 如果正在控制继电器，则不更新状态显示
+                if (this.isRelayLoading) {
+                    return;
+                }
+
                 // 先获取设备在线状态
                 const onlineRes = await uni.request({
                     url: 'http://118.190.202.38:3000/api/online-dtus',
@@ -140,7 +165,6 @@ export default {
                 if(onlineRes.data.success) {
                     const onlineDevices = onlineRes.data.devices.map(device => device.dtuNo)
                     const isOnline = onlineDevices.includes(deviceId)
-                    this.deviceStatus.isOnline = isOnline
                     
                     // 如果设备在线，则获取详细状态
                     if(isOnline) {
@@ -149,13 +173,13 @@ export default {
                             method: 'GET'
                         })
                         
-                        if(statusRes.data.success) {
+                        if(statusRes.data.success && !this.isRelayLoading) {
                             this.deviceStatus = {
                                 ...statusRes.data.data,
                                 isOnline
                             }
                         }
-                    } else {
+                    } else if (!this.isRelayLoading) {
                         // 如果设备离线，清空状态数据
                         this.deviceStatus = {
                             isOnline: false,
@@ -176,13 +200,16 @@ export default {
                 }
             } catch(e) {
                 console.error('获取设备状态失败:', e)
-                uni.showToast({
-                    title: '获取设备状态失败',
-                    icon: 'none'
-                })
+                if (!this.isRelayLoading) {
+                    uni.showToast({
+                        title: '获取设备状态失败',
+                        icon: 'none'
+                    })
+                }
             }
         },
-        async toggleRelay(status) {
+        async toggleRelay(e) {
+            const status = e.detail.value
             const deviceId = this.deviceList[this.selectedIndex].id
             
             if (!this.deviceStatus.isOnline) {
@@ -193,9 +220,17 @@ export default {
                 return
             }
 
+            // 设置加载状态
+            this.isRelayLoading = true
+            // 停止轮询
+            this.stopPolling()
+            
+            // 保存旧状态以便恢复
+            const oldStatus = this.deviceStatus.relayStatus
+
             try {
-                // 发送控制命令前先停止轮询
-                this.stopPolling()
+                // 立即更新状态，实现即时响应
+                this.deviceStatus.relayStatus = status ? '闭合' : '断开'
 
                 const res = await uni.request({
                     url: 'http://118.190.202.38:3000/api/control/relay',
@@ -210,20 +245,33 @@ export default {
                 })
                 
                 if(res.data.code === 0) {
-                    // 控制成功后立即更新UI显示
-                    this.deviceStatus.relayStatus = status ? '闭合' : '断开'
-                    
                     uni.showToast({
                         title: '操作成功',
                         icon: 'success'
                     })
-                    
-                    // 延迟时间也相应缩短
-                    setTimeout(() => {
+
+                    // 延迟查询实际状态
+                    setTimeout(async () => {
+                        const statusRes = await uni.request({
+                            url: `http://118.190.202.38:3000/api/dtu-status/${deviceId}`,
+                            method: 'GET'
+                        })
+                        
+                        if(statusRes.data.success) {
+                            this.deviceStatus = {
+                                ...statusRes.data.data,
+                                isOnline: true
+                            }
+                        }
+                        
+                        // 最后才关闭加载状态并恢复轮询
+                        this.isRelayLoading = false
                         this.startPolling()
-                    }, 1000)  // 改为1000毫秒
+                    }, 1000)
                 } else {
-                    // 控制失败时立即恢复轮询
+                    // 控制失败时恢复旧状态
+                    this.deviceStatus.relayStatus = oldStatus
+                    this.isRelayLoading = false
                     this.startPolling()
                     uni.showToast({
                         title: res.data.message || '控制失败',
@@ -231,7 +279,9 @@ export default {
                     })
                 }
             } catch(e) {
-                // 发生错误时立即恢复轮询
+                // 发生错误时恢复旧状态
+                this.deviceStatus.relayStatus = oldStatus
+                this.isRelayLoading = false
                 this.startPolling()
                 uni.showToast({
                     title: '控制失败',
@@ -288,5 +338,27 @@ export default {
     justify-content: space-between;
     align-items: center;
     padding: 10px 0;
+}
+
+.relay-status {
+    display: flex;
+    align-items: center;
+}
+
+.loading-icon {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    border: 3px solid #f3f3f3;
+    border-top: 3px solid #007AFF;  /* 使用uni-app主题蓝色 */
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin-left: 10px;
+    vertical-align: middle;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
 }
 </style>
