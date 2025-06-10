@@ -5,7 +5,13 @@
             <picker @change="onDeviceChange" :value="selectedIndex" :range="deviceList" range-key="name">
                 <view class="picker-button">
                     <text class="device-label">当前设备:</text>
-                    <text class="device-name">{{deviceList[selectedIndex].name}}</text>
+                    <text :class="[
+                        'device-name',
+                        deviceList[selectedIndex].isOnline ? 'device-online' : 'device-offline'
+                    ]">
+                        {{deviceList[selectedIndex].name}}
+                        <text class="device-status">{{deviceList[selectedIndex].isOnline ? '(在线)' : '(离线)'}}</text>
+                    </text>
                     <text class="picker-arrow">▼</text>
                 </view>
             </picker>
@@ -88,10 +94,10 @@ export default {
     data() {
         return {
             deviceList: [
-                { id: '13012345005', name: 'DTU设备1' },
-                { id: '13012345001', name: 'DTU设备2' },
-                { id: '13912345678', name: 'DTU设备3' },
-                { id: '13912345679', name: 'DTU设备4' }
+                { id: '13012345005', name: 'DTU设备1', isOnline: false },
+                { id: '13012345001', name: 'DTU设备2', isOnline: false },
+                { id: '13912345678', name: 'DTU设备3', isOnline: false },
+                { id: '13912345679', name: 'DTU设备4', isOnline: false }
             ],
             selectedIndex: 0,
             deviceStatus: {
@@ -136,20 +142,41 @@ export default {
         }
     },
     methods: {
-        onDeviceChange(e) {
+        async updateDevicesOnlineStatus() {
+            try {
+                const onlineRes = await uni.request({
+                    url: `${BASE_URL}/online-dtus`,
+                    method: 'GET'
+                })
+                
+                if(onlineRes.data.success) {
+                    const onlineDevices = onlineRes.data.devices.map(device => device.dtuNo)
+                    // 更新所有设备的在线状态
+                    this.deviceList = this.deviceList.map(device => ({
+                        ...device,
+                        isOnline: onlineDevices.includes(device.id)
+                    }))
+                }
+            } catch(e) {
+                console.error('获取在线设备失败:', e)
+            }
+        },
+        
+        // 修改设备选择方法
+        async onDeviceChange(e) {
             this.selectedIndex = e.detail.value
-            // 切换设备后立即获取新设备的状态
-            this.getDeviceStatus()
+            await this.getDeviceStatus() // 获取新设备状态
         },
 
         startPolling() {
-            // 立即执行一次当前设备状态查询
+            // 立即执行更新
+            this.updateDevicesOnlineStatus()
             this.getDeviceStatus()
             
-            // 将轮询间隔从5秒改为1秒
             this.timer = setInterval(() => {
+                this.updateDevicesOnlineStatus()
                 this.getDeviceStatus()
-            }, 1000)  // 改为1000毫秒
+            }, 1000)
         },
 
         stopPolling() {
@@ -305,12 +332,25 @@ export default {
 }
 
 .device-name {
-    color: #333;  /* 更深的文字颜色 */
+    color: #333;
     font-size: 15px;
-    font-weight: 500;  /* 减小字体粗细 */
+    font-weight: 500;
     margin: 0 10px;
     flex: 1;
     text-align: center;
+}
+
+.device-online {
+    color: #52c41a;
+}
+
+.device-offline {
+    color: #999;
+}
+
+.device-status {
+    font-size: 12px;
+    margin-left: 4px;
 }
 
 .picker-arrow {
@@ -438,5 +478,18 @@ export default {
 /* 禁用状态的样式 */
 .relay-switch[disabled] {
     opacity: 0.6;
+}
+
+/* 自定义下拉菜单样式（如果平台支持的话） */
+.picker-view-column {
+    line-height: 34px;
+}
+
+.picker-item-online {
+    color: #52c41a;
+}
+
+.picker-item-offline {
+    color: #999;
 }
 </style>

@@ -50,10 +50,10 @@ if (uni.restoreGlobal) {
     data() {
       return {
         deviceList: [
-          { id: "13012345005", name: "DTU设备1" },
-          { id: "13012345001", name: "DTU设备2" },
-          { id: "13912345678", name: "DTU设备3" },
-          { id: "13912345679", name: "DTU设备4" }
+          { id: "13012345005", name: "DTU设备1", isOnline: false },
+          { id: "13012345001", name: "DTU设备2", isOnline: false },
+          { id: "13912345678", name: "DTU设备3", isOnline: false },
+          { id: "13912345679", name: "DTU设备4", isOnline: false }
         ],
         selectedIndex: 0,
         deviceStatus: {
@@ -95,13 +95,33 @@ if (uni.restoreGlobal) {
       }
     },
     methods: {
-      onDeviceChange(e) {
+      async updateDevicesOnlineStatus() {
+        try {
+          const onlineRes = await uni.request({
+            url: `${BASE_URL}/online-dtus`,
+            method: "GET"
+          });
+          if (onlineRes.data.success) {
+            const onlineDevices = onlineRes.data.devices.map((device) => device.dtuNo);
+            this.deviceList = this.deviceList.map((device) => ({
+              ...device,
+              isOnline: onlineDevices.includes(device.id)
+            }));
+          }
+        } catch (e) {
+          formatAppLog("error", "at pages/index/index.vue:161", "获取在线设备失败:", e);
+        }
+      },
+      // 修改设备选择方法
+      async onDeviceChange(e) {
         this.selectedIndex = e.detail.value;
-        this.getDeviceStatus();
+        await this.getDeviceStatus();
       },
       startPolling() {
+        this.updateDevicesOnlineStatus();
         this.getDeviceStatus();
         this.timer = setInterval(() => {
+          this.updateDevicesOnlineStatus();
           this.getDeviceStatus();
         }, 1e3);
       },
@@ -152,7 +172,7 @@ if (uni.restoreGlobal) {
             }
           }
         } catch (e) {
-          formatAppLog("error", "at pages/index/index.vue:210", "获取设备状态失败:", e);
+          formatAppLog("error", "at pages/index/index.vue:237", "获取设备状态失败:", e);
           uni.showToast({
             title: "获取设备状态失败",
             icon: "none"
@@ -221,10 +241,28 @@ if (uni.restoreGlobal) {
             vue.createElementVNode("text", { class: "device-label" }, "当前设备:"),
             vue.createElementVNode(
               "text",
-              { class: "device-name" },
-              vue.toDisplayString($data.deviceList[$data.selectedIndex].name),
-              1
-              /* TEXT */
+              {
+                class: vue.normalizeClass([
+                  "device-name",
+                  $data.deviceList[$data.selectedIndex].isOnline ? "device-online" : "device-offline"
+                ])
+              },
+              [
+                vue.createTextVNode(
+                  vue.toDisplayString($data.deviceList[$data.selectedIndex].name) + " ",
+                  1
+                  /* TEXT */
+                ),
+                vue.createElementVNode(
+                  "text",
+                  { class: "device-status" },
+                  vue.toDisplayString($data.deviceList[$data.selectedIndex].isOnline ? "(在线)" : "(离线)"),
+                  1
+                  /* TEXT */
+                )
+              ],
+              2
+              /* CLASS */
             ),
             vue.createElementVNode("text", { class: "picker-arrow" }, "▼")
           ])

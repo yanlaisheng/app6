@@ -23,12 +23,22 @@
     font-size: 14px;
 }
 .device-name {
-    color: #333;  /* 更深的文字颜色 */
+    color: #333;
     font-size: 15px;
-    font-weight: 500;  /* 减小字体粗细 */
+    font-weight: 500;
     margin: 0 10px;
     flex: 1;
     text-align: center;
+}
+.device-online {
+    color: #52c41a;
+}
+.device-offline {
+    color: #999;
+}
+.device-status {
+    font-size: 12px;
+    margin-left: 4px;
 }
 .picker-arrow {
     color: #999;  /* 更柔和的箭头颜色 */
@@ -136,4 +146,15 @@
 /* 禁用状态的样式 */
 .relay-switch[disabled] {
     opacity: 0.6;
+}
+
+/* 自定义下拉菜单样式（如果平台支持的话） */
+.picker-view-column {
+    line-height: 34px;
+}
+.picker-item-online {
+    color: #52c41a;
+}
+.picker-item-offline {
+    color: #999;
 }
