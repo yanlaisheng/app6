@@ -3,37 +3,137 @@
     padding: 20px;
 }
 .device-select {
-    background-color: #fff;
-    padding: 15px;
-    border-radius: 8px;
-    margin-bottom: 20px;
+    background: linear-gradient(135deg, #f8f9fa, #e9ecef);  /* 改用更柔和的渐变 */
+    padding: 12px;
+    border-radius: 6px;
+    margin-bottom: 15px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);  /* 更轻柔的阴影 */
+}
+.picker-button {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background-color: #ffffff;
+    padding: 10px 15px;
+    border-radius: 4px;
+    border: 1px solid #e0e0e0;  /* 添加细边框 */
+}
+.device-label {
+    color: #666;  /* 更柔和的文字颜色 */
+    font-size: 14px;
+}
+.device-name {
+    color: #333;  /* 更深的文字颜色 */
+    font-size: 15px;
+    font-weight: 500;  /* 减小字体粗细 */
+    margin: 0 10px;
+    flex: 1;
+    text-align: center;
+}
+.picker-arrow {
+    color: #999;  /* 更柔和的箭头颜色 */
+    font-size: 12px;
 }
 .status-panel {
-    background-color: #fff;
+    background: #ffffff;
     padding: 20px;
-    border-radius: 8px;
+    border-radius: 12px;
     margin-bottom: 20px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    border: 1px solid #f0f0f0;
 }
 .status-item {
     display: flex;
     justify-content: space-between;
-    margin-bottom: 15px;
+    align-items: center;
+    padding: 12px 15px;
+    margin-bottom: 8px;
+    border-radius: 6px;
+    background: #f8f9fa;
+    transition: all 0.3s ease;
+}
+.status-item:hover {
+    background: #f0f2f5;
+}
+.status-item uni-text:first-child {
+    color: #666;
     font-size: 14px;
 }
+.status-item uni-text:last-child {
+    color: #333;
+    font-size: 15px;
+    font-weight: 500;
+}
 .online {
-    color: #4cd964;
+    color: #52c41a !important;
+    font-weight: 600;
 }
 .offline {
-    color: #dd524d;
+    color: #ff4d4f !important;
+    font-weight: 600;
+}
+
+/* 为不同类型的数据添加不同的颜色 */
+.status-item.voltage uni-text:last-child {
+    color: #1890ff;
+}
+.status-item.current uni-text:last-child {
+    color: #722ed1;
+}
+.status-item.energy uni-text:last-child {
+    color: #13c2c2;
+}
+.status-item.pressure uni-text:last-child {
+    color: #fa8c16;
 }
 .control-panel {
-    background-color: #fff;
+    background: #ffffff;
     padding: 20px;
-    border-radius: 8px;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    border: 1px solid #f0f0f0;
 }
 .relay-item {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 10px 0;
+    padding: 15px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    transition: all 0.3s ease;
+}
+.relay-item:hover {
+    background: #f0f2f5;
+}
+.relay-status {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.relay-label {
+    color: #666;
+    font-size: 14px;
+}
+.relay-value {
+    font-size: 15px;
+    font-weight: 500;
+    padding: 4px 12px;
+    border-radius: 4px;
+    background: #f0f0f0;
+}
+.relay-on {
+    color: #52c41a;
+    background: rgba(82, 196, 26, 0.1);
+}
+.relay-off {
+    color: #ff4d4f;
+    background: rgba(255, 77, 79, 0.1);
+}
+.relay-switch {
+    transform: scale(0.9);
+}
+
+/* 禁用状态的样式 */
+.relay-switch[disabled] {
+    opacity: 0.6;
 }

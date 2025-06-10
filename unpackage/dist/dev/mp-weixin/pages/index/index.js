@@ -36,6 +36,19 @@ const _sfc_main = {
   onUnload() {
     this.stopPolling();
   },
+  computed: {
+    formattedTime() {
+      if (!this.deviceStatus.rcvTime)
+        return "--";
+      const date = new Date(this.deviceStatus.rcvTime);
+      const month = String(date.getMonth() + 1).padStart(2, "0");
+      const day = String(date.getDate()).padStart(2, "0");
+      const hours = String(date.getHours()).padStart(2, "0");
+      const minutes = String(date.getMinutes()).padStart(2, "0");
+      const seconds = String(date.getSeconds()).padStart(2, "0");
+      return `${date.getFullYear()}/${month}/${day} ${hours}:${minutes}:${seconds}`;
+    }
+  },
   methods: {
     onDeviceChange(e) {
       this.selectedIndex = e.detail.value;
@@ -94,7 +107,7 @@ const _sfc_main = {
           }
         }
       } catch (e) {
-        common_vendor.index.__f__("error", "at pages/index/index.vue:182", "获取设备状态失败:", e);
+        common_vendor.index.__f__("error", "at pages/index/index.vue:210", "获取设备状态失败:", e);
         common_vendor.index.showToast({
           title: "获取设备状态失败",
           icon: "none"
@@ -158,7 +171,7 @@ function _sfc_render(_ctx, _cache, $props, $setup, $data, $options) {
     e: common_vendor.t($data.deviceStatus.isOnline ? "在线" : "离线"),
     f: $data.deviceStatus.isOnline ? 1 : "",
     g: !$data.deviceStatus.isOnline ? 1 : "",
-    h: common_vendor.t($data.deviceStatus.rcvTime || "--"),
+    h: common_vendor.t($options.formattedTime),
     i: common_vendor.t($data.deviceStatus.voltageAB || "--"),
     j: common_vendor.t($data.deviceStatus.voltageBC || "--"),
     k: common_vendor.t($data.deviceStatus.voltageCA || "--"),
@@ -168,8 +181,10 @@ function _sfc_render(_ctx, _cache, $props, $setup, $data, $options) {
     o: common_vendor.t($data.deviceStatus.energy || "--"),
     p: common_vendor.t($data.deviceStatus.pressure || "--"),
     q: common_vendor.t($data.deviceStatus.relayStatus || "--"),
-    r: $data.deviceStatus.relayStatus === "闭合",
-    s: common_vendor.o((e) => $options.toggleRelay(e.detail.value))
+    r: common_vendor.n($data.deviceStatus.relayStatus === "闭合" ? "relay-on" : "relay-off"),
+    s: $data.deviceStatus.relayStatus === "闭合",
+    t: common_vendor.o((e) => $options.toggleRelay(e.detail.value)),
+    v: !$data.deviceStatus.isOnline
   };
 }
 const MiniProgramPage = /* @__PURE__ */ common_vendor._export_sfc(_sfc_main, [["render", _sfc_render]]);

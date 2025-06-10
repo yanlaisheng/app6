@@ -81,6 +81,19 @@ if (uni.restoreGlobal) {
     onUnload() {
       this.stopPolling();
     },
+    computed: {
+      formattedTime() {
+        if (!this.deviceStatus.rcvTime)
+          return "--";
+        const date = new Date(this.deviceStatus.rcvTime);
+        const month = String(date.getMonth() + 1).padStart(2, "0");
+        const day = String(date.getDate()).padStart(2, "0");
+        const hours = String(date.getHours()).padStart(2, "0");
+        const minutes = String(date.getMinutes()).padStart(2, "0");
+        const seconds = String(date.getSeconds()).padStart(2, "0");
+        return `${date.getFullYear()}/${month}/${day} ${hours}:${minutes}:${seconds}`;
+      }
+    },
     methods: {
       onDeviceChange(e) {
         this.selectedIndex = e.detail.value;
@@ -139,7 +152,7 @@ if (uni.restoreGlobal) {
             }
           }
         } catch (e) {
-          formatAppLog("error", "at pages/index/index.vue:182", "获取设备状态失败:", e);
+          formatAppLog("error", "at pages/index/index.vue:210", "获取设备状态失败:", e);
           uni.showToast({
             title: "获取设备状态失败",
             icon: "none"
@@ -204,18 +217,22 @@ if (uni.restoreGlobal) {
           range: $data.deviceList,
           "range-key": "name"
         }, [
-          vue.createElementVNode(
-            "view",
-            { class: "picker" },
-            " 当前设备: " + vue.toDisplayString($data.deviceList[$data.selectedIndex].name),
-            1
-            /* TEXT */
-          )
+          vue.createElementVNode("view", { class: "picker-button" }, [
+            vue.createElementVNode("text", { class: "device-label" }, "当前设备:"),
+            vue.createElementVNode(
+              "text",
+              { class: "device-name" },
+              vue.toDisplayString($data.deviceList[$data.selectedIndex].name),
+              1
+              /* TEXT */
+            ),
+            vue.createElementVNode("text", { class: "picker-arrow" }, "▼")
+          ])
         ], 40, ["value", "range"])
       ]),
       vue.createCommentVNode(" 设备状态显示区 "),
       vue.createElementVNode("view", { class: "status-panel" }, [
-        vue.createElementVNode("view", { class: "status-item" }, [
+        vue.createElementVNode("view", { class: "status-item status-connection" }, [
           vue.createElementVNode("text", null, "设备状态:"),
           vue.createElementVNode(
             "text",
@@ -227,17 +244,17 @@ if (uni.restoreGlobal) {
             /* TEXT, CLASS */
           )
         ]),
-        vue.createElementVNode("view", { class: "status-item" }, [
+        vue.createElementVNode("view", { class: "status-item status-time" }, [
           vue.createElementVNode("text", null, "更新时间:"),
           vue.createElementVNode(
             "text",
             null,
-            vue.toDisplayString($data.deviceStatus.rcvTime || "--"),
+            vue.toDisplayString($options.formattedTime),
             1
             /* TEXT */
           )
         ]),
-        vue.createElementVNode("view", { class: "status-item" }, [
+        vue.createElementVNode("view", { class: "status-item voltage" }, [
           vue.createElementVNode("text", null, "AB线电压:"),
           vue.createElementVNode(
             "text",
@@ -247,7 +264,7 @@ if (uni.restoreGlobal) {
             /* TEXT */
           )
         ]),
-        vue.createElementVNode("view", { class: "status-item" }, [
+        vue.createElementVNode("view", { class: "status-item voltage" }, [
           vue.createElementVNode("text", null, "BC线电压:"),
           vue.createElementVNode(
             "text",
@@ -257,7 +274,7 @@ if (uni.restoreGlobal) {
             /* TEXT */
           )
         ]),
-        vue.createElementVNode("view", { class: "status-item" }, [
+        vue.createElementVNode("view", { class: "status-item voltage" }, [
           vue.createElementVNode("text", null, "CA线电压:"),
           vue.createElementVNode(
             "text",
@@ -267,7 +284,7 @@ if (uni.restoreGlobal) {
             /* TEXT */
           )
         ]),
-        vue.createElementVNode("view", { class: "status-item" }, [
+        vue.createElementVNode("view", { class: "status-item current" }, [
           vue.createElementVNode("text", null, "A相电流:"),
           vue.createElementVNode(
             "text",
@@ -277,7 +294,7 @@ if (uni.restoreGlobal) {
             /* TEXT */
           )
         ]),
-        vue.createElementVNode("view", { class: "status-item" }, [
+        vue.createElementVNode("view", { class: "status-item current" }, [
           vue.createElementVNode("text", null, "B相电流:"),
           vue.createElementVNode(
             "text",
@@ -287,7 +304,7 @@ if (uni.restoreGlobal) {
             /* TEXT */
           )
         ]),
-        vue.createElementVNode("view", { class: "status-item" }, [
+        vue.createElementVNode("view", { class: "status-item current" }, [
           vue.createElementVNode("text", null, "C相电流:"),
           vue.createElementVNode(
             "text",
@@ -297,7 +314,7 @@ if (uni.restoreGlobal) {
             /* TEXT */
           )
         ]),
-        vue.createElementVNode("view", { class: "status-item" }, [
+        vue.createElementVNode("view", { class: "status-item energy" }, [
           vue.createElementVNode("text", null, "用电量:"),
           vue.createElementVNode(
             "text",
@@ -307,7 +324,7 @@ if (uni.restoreGlobal) {
             /* TEXT */
           )
         ]),
-        vue.createElementVNode("view", { class: "status-item" }, [
+        vue.createElementVNode("view", { class: "status-item pressure" }, [
           vue.createElementVNode("text", null, "压力:"),
           vue.createElementVNode(
             "text",
@@ -321,17 +338,27 @@ if (uni.restoreGlobal) {
       vue.createCommentVNode(" 继电器控制区 "),
       vue.createElementVNode("view", { class: "control-panel" }, [
         vue.createElementVNode("view", { class: "relay-item" }, [
-          vue.createElementVNode(
-            "text",
-            null,
-            "继电器状态: " + vue.toDisplayString($data.deviceStatus.relayStatus || "--"),
-            1
-            /* TEXT */
-          ),
+          vue.createElementVNode("view", { class: "relay-status" }, [
+            vue.createElementVNode("text", { class: "relay-label" }, "继电器状态:"),
+            vue.createElementVNode(
+              "text",
+              {
+                class: vue.normalizeClass([
+                  "relay-value",
+                  $data.deviceStatus.relayStatus === "闭合" ? "relay-on" : "relay-off"
+                ])
+              },
+              vue.toDisplayString($data.deviceStatus.relayStatus || "--"),
+              3
+              /* TEXT, CLASS */
+            )
+          ]),
           vue.createElementVNode("switch", {
             checked: $data.deviceStatus.relayStatus === "闭合",
-            onChange: _cache[1] || (_cache[1] = (e) => $options.toggleRelay(e.detail.value))
-          }, null, 40, ["checked"])
+            onChange: _cache[1] || (_cache[1] = (e) => $options.toggleRelay(e.detail.value)),
+            disabled: !$data.deviceStatus.isOnline,
+            class: "relay-switch"
+          }, null, 40, ["checked", "disabled"])
         ])
       ])
     ]);
