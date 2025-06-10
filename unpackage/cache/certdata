@@ -1,0 +1,4 @@
+andrCertfile=D:/jdk-11.0.26/bin/test.keystore
+andrCertAlias=testalias
+andrCertPass=ZeOrisDYiAqmDUQb8d363Q==
+storePassword=ZeOrisDYiAqmDUQb8d363Q==

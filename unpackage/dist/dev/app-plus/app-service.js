@@ -45,6 +45,7 @@ if (uni.restoreGlobal) {
     }
     return target;
   };
+  const BASE_URL = "https://monitor.sanli.cn:3000/api";
   const _sfc_main$1 = {
     data() {
       return {
@@ -101,7 +102,7 @@ if (uni.restoreGlobal) {
         try {
           const deviceId = this.deviceList[this.selectedIndex].id;
           const onlineRes = await uni.request({
-            url: "http://118.190.202.38:3000/api/online-dtus",
+            url: `${BASE_URL}/online-dtus`,
             method: "GET"
           });
           if (onlineRes.data.success) {
@@ -110,7 +111,7 @@ if (uni.restoreGlobal) {
             this.deviceStatus.isOnline = isOnline;
             if (isOnline) {
               const statusRes = await uni.request({
-                url: `http://118.190.202.38:3000/api/dtu-status/${deviceId}`,
+                url: `${BASE_URL}/dtu-status/${deviceId}`,
                 method: "GET"
               });
               if (statusRes.data.success) {
@@ -138,7 +139,7 @@ if (uni.restoreGlobal) {
             }
           }
         } catch (e) {
-          formatAppLog("error", "at pages/index/index.vue:178", "获取设备状态失败:", e);
+          formatAppLog("error", "at pages/index/index.vue:182", "获取设备状态失败:", e);
           uni.showToast({
             title: "获取设备状态失败",
             icon: "none"
@@ -157,7 +158,7 @@ if (uni.restoreGlobal) {
         try {
           this.stopPolling();
           const res = await uni.request({
-            url: "http://118.190.202.38:3000/api/control/relay",
+            url: `${BASE_URL}/control/relay`,
             method: "POST",
             data: {
               dtuNo: deviceId,

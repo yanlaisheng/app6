@@ -1,5 +1,6 @@
 "use strict";
 const common_vendor = require("../../common/vendor.js");
+const BASE_URL = "https://monitor.sanli.cn:3000/api";
 const _sfc_main = {
   data() {
     return {
@@ -56,7 +57,7 @@ const _sfc_main = {
       try {
         const deviceId = this.deviceList[this.selectedIndex].id;
         const onlineRes = await common_vendor.index.request({
-          url: "http://118.190.202.38:3000/api/online-dtus",
+          url: `${BASE_URL}/online-dtus`,
           method: "GET"
         });
         if (onlineRes.data.success) {
@@ -65,7 +66,7 @@ const _sfc_main = {
           this.deviceStatus.isOnline = isOnline;
           if (isOnline) {
             const statusRes = await common_vendor.index.request({
-              url: `http://118.190.202.38:3000/api/dtu-status/${deviceId}`,
+              url: `${BASE_URL}/dtu-status/${deviceId}`,
               method: "GET"
             });
             if (statusRes.data.success) {
@@ -93,7 +94,7 @@ const _sfc_main = {
           }
         }
       } catch (e) {
-        common_vendor.index.__f__("error", "at pages/index/index.vue:178", "获取设备状态失败:", e);
+        common_vendor.index.__f__("error", "at pages/index/index.vue:182", "获取设备状态失败:", e);
         common_vendor.index.showToast({
           title: "获取设备状态失败",
           icon: "none"
@@ -112,7 +113,7 @@ const _sfc_main = {
       try {
         this.stopPolling();
         const res = await common_vendor.index.request({
-          url: "http://118.190.202.38:3000/api/control/relay",
+          url: `${BASE_URL}/control/relay`,
           method: "POST",
           data: {
             dtuNo: deviceId,
