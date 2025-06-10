@@ -158,3 +158,83 @@
 .picker-item-offline {
     color: #999;
 }
+.custom-picker {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 999;
+}
+.picker-mask {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+}
+.picker-content {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: #fff;
+    border-radius: 12px 12px 0 0;
+    overflow: hidden;
+    transform: translateY(0);
+    animation: slideUp 0.3s ease;
+}
+.picker-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px 20px;
+    border-bottom: 1px solid #f0f0f0;
+}
+.picker-close {
+    font-size: 24px;
+    color: #999;
+    padding: 0 10px;
+}
+.picker-body {
+    max-height: 60vh;
+    overflow-y: auto;
+}
+.picker-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px 20px;
+    border-bottom: 1px solid #f5f5f5;
+}
+.picker-item-online {
+    color: #52c41a;
+}
+.picker-item-offline {
+    color: #999;
+}
+.picker-item-selected {
+    background: #f0f7ff;
+}
+.device-status-tag {
+    font-size: 12px;
+    padding: 2px 8px;
+    border-radius: 10px;
+}
+.picker-item-online .device-status-tag {
+    background: rgba(82, 196, 26, 0.1);
+    color: #52c41a;
+}
+.picker-item-offline .device-status-tag {
+    background: rgba(0, 0, 0, 0.05);
+    color: #999;
+}
+@keyframes slideUp {
+from {
+        transform: translateY(100%);
+}
+to {
+        transform: translateY(0);
+}
+}

@@ -1,21 +1,46 @@
 <template>
-    <view class="container">
-        <!-- 设备选择区 -->
-        <view class="device-select">
-            <picker @change="onDeviceChange" :value="selectedIndex" :range="deviceList" range-key="name">
-                <view class="picker-button">
-                    <text class="device-label">当前设备:</text>
-                    <text :class="[
-                        'device-name',
-                        deviceList[selectedIndex].isOnline ? 'device-online' : 'device-offline'
-                    ]">
-                        {{deviceList[selectedIndex].name}}
-                        <text class="device-status">{{deviceList[selectedIndex].isOnline ? '(在线)' : '(离线)'}}</text>
-                    </text>
-                    <text class="picker-arrow">▼</text>
-                </view>
-            </picker>
+    <!-- 替换原有的picker部分 -->
+    <view class="device-select">
+        <view class="picker-button" @tap="showDeviceList">
+            <text class="device-label">当前设备:</text>
+            <text :class="[
+                'device-name',
+                deviceList[selectedIndex].isOnline ? 'device-online' : 'device-offline'
+            ]">
+                {{deviceList[selectedIndex].name}}
+                <text class="device-status">{{deviceList[selectedIndex].isOnline ? '(在线)' : '(离线)'}}</text>
+            </text>
+            <text class="picker-arrow">▼</text>
         </view>
+    </view>
+
+    <!-- 添加自定义弹出层 -->
+    <view class="custom-picker" v-if="showPicker" @tap.stop="hidePicker">
+        <view class="picker-mask"></view>
+        <view class="picker-content" @tap.stop>
+            <view class="picker-header">
+                <text>选择设备</text>
+                <text class="picker-close" @tap="hidePicker">×</text>
+            </view>
+            <view class="picker-body">
+                <view 
+                    v-for="(device, index) in deviceList" 
+                    :key="device.id"
+                    :class="[
+                        'picker-item',
+                        device.isOnline ? 'picker-item-online' : 'picker-item-offline',
+                        selectedIndex === index ? 'picker-item-selected' : ''
+                    ]"
+                    @tap="selectDevice(index)"
+                >
+                    <text>{{device.name}}</text>
+                    <text class="device-status-tag">{{device.isOnline ? '在线' : '离线'}}</text>
+                </view>
+            </view>
+        </view>
+    </view>
+
+    <view class="container">
         
         <!-- 设备状态显示区 -->
         <view class="status-panel">
@@ -116,7 +141,8 @@ export default {
                 relayStatus: ''
             },
             timer: null,
-            onlineDevices: []
+            onlineDevices: [],
+            showPicker: false
         }
     },
     onLoad() {
@@ -298,6 +324,20 @@ export default {
                     icon: 'none'
                 })
             }
+        },
+        // 添加新方法
+        showDeviceList() {
+            this.showPicker = true
+        },
+        
+        hidePicker() {
+            this.showPicker = false
+        },
+        
+        async selectDevice(index) {
+            this.selectedIndex = index
+            this.hidePicker()
+            await this.getDeviceStatus()
         }
     }
 }
@@ -491,5 +531,99 @@ export default {
 
 .picker-item-offline {
     color: #999;
+}
+
+.custom-picker {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 999;
+}
+
+.picker-mask {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+}
+
+.picker-content {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: #fff;
+    border-radius: 12px 12px 0 0;
+    overflow: hidden;
+    transform: translateY(0);
+    animation: slideUp 0.3s ease;
+}
+
+.picker-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px 20px;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.picker-close {
+    font-size: 24px;
+    color: #999;
+    padding: 0 10px;
+}
+
+.picker-body {
+    max-height: 60vh;
+    overflow-y: auto;
+}
+
+.picker-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px 20px;
+    border-bottom: 1px solid #f5f5f5;
+}
+
+.picker-item-online {
+    color: #52c41a;
+}
+
+.picker-item-offline {
+    color: #999;
+}
+
+.picker-item-selected {
+    background: #f0f7ff;
+}
+
+.device-status-tag {
+    font-size: 12px;
+    padding: 2px 8px;
+    border-radius: 10px;
+}
+
+.picker-item-online .device-status-tag {
+    background: rgba(82, 196, 26, 0.1);
+    color: #52c41a;
+}
+
+.picker-item-offline .device-status-tag {
+    background: rgba(0, 0, 0, 0.05);
+    color: #999;
+}
+
+@keyframes slideUp {
+    from {
+        transform: translateY(100%);
+    }
+    to {
+        transform: translateY(0);
+    }
 }
 </style>
