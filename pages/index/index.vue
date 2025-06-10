@@ -67,6 +67,9 @@
 </template>
 
 <script>
+// 添加基础URL配置
+const BASE_URL = 'https://monitor.sanli.cn:3000/api'
+
 export default {
     data() {
         return {
@@ -131,9 +134,9 @@ export default {
             try {
                 const deviceId = this.deviceList[this.selectedIndex].id
                 
-                // 先获取设备在线状态
+                // 修改在线状态请求地址
                 const onlineRes = await uni.request({
-                    url: 'http://118.190.202.38:3000/api/online-dtus',
+                    url: `${BASE_URL}/online-dtus`,
                     method: 'GET'
                 })
                 
@@ -144,8 +147,9 @@ export default {
                     
                     // 如果设备在线，则获取详细状态
                     if(isOnline) {
+                        // 修改设备状态请求地址
                         const statusRes = await uni.request({
-                            url: `http://118.190.202.38:3000/api/dtu-status/${deviceId}`,
+                            url: `${BASE_URL}/dtu-status/${deviceId}`,
                             method: 'GET'
                         })
                         
@@ -197,8 +201,9 @@ export default {
                 // 发送控制命令前先停止轮询
                 this.stopPolling()
 
+                // 修改继电器控制请求地址
                 const res = await uni.request({
-                    url: 'http://118.190.202.38:3000/api/control/relay',
+                    url: `${BASE_URL}/control/relay`,
                     method: 'POST',
                     data: {
                         dtuNo: deviceId,
